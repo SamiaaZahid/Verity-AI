@@ -751,21 +751,13 @@ if research_pressed:
     # 1. Empty input validation
     if not query_text or not query_text.strip():
         st.warning("Please enter a research inquiry before running verification.")
-    # 2. Strict Key Validation (Clear setup message, NEVER fake output)
+    # 2. Key Validation: Tavily is required for search retrieval
     elif not active_tavily_key:
         st.error("Execution Blocked: TAVILY_API_KEY is missing from environment / secrets.")
         st.info("""
         Setup Instructions for Tavily:
         1. Obtain a free API key at https://tavily.com.
         2. Set TAVILY_API_KEY in your local .env file or Streamlit Cloud Secrets.
-        3. Refresh the page to execute verified research.
-        """)
-    elif not active_nebius_key:
-        st.error("Execution Blocked: NEBIUS_API_KEY is missing from environment / secrets.")
-        st.info("""
-        Setup Instructions for Nebius Token Factory:
-        1. Obtain an API key from https://tokenfactory.nebius.com under API Keys.
-        2. Set NEBIUS_API_KEY in your local .env file or Streamlit Cloud Secrets.
         3. Refresh the page to execute verified research.
         """)
     else:
@@ -790,7 +782,7 @@ if research_pressed:
         try:
             target_model = None if chosen_model == "Auto-select best open model" else chosen_model
             
-            with st.spinner("Synthesizing verified research..."):
+            with st.spinner("Executing verified research..."):
                 result = run_verity_agent(
                     question=query_text.strip(),
                     tavily_api_key=active_tavily_key,
@@ -802,7 +794,10 @@ if research_pressed:
                 )
                 st.session_state.research_results = result
                 progress_placeholder.empty()
-                st.success("Research synthesis verified against primary web sources.")
+                if result.get("ai_unavailable"):
+                    st.info("Web ground-truth retrieved. Add NEBIUS_API_KEY to enable AI synthesis.")
+                else:
+                    st.success("Research synthesis verified against primary web sources.")
         except Exception as e:
             progress_placeholder.empty()
             st.error(f"Verification Pipeline Error: {str(e)}")
@@ -812,77 +807,97 @@ res = st.session_state.research_results
 if res:
     st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
     
-    # Confidence Level & Audit Banner
-    conf = res.get("confidence", "Medium")
-    conf_reason = res.get("confidence_reason", "")
-    
-    if conf == "High":
-        conf_class = "high"
-        dot_class = "dot-high"
-        conf_text_color = "var(--color-teal)"
-    elif conf == "Medium":
-        conf_class = "medium"
-        dot_class = "dot-medium"
-        conf_text_color = "var(--color-warning)"
-    else:
-        conf_class = "low"
-        dot_class = "dot-low"
-        conf_text_color = "var(--color-error)"
+    is_ai_unavailable = res.get("ai_unavailable", False)
 
-    st.markdown(f"""
-    <div class="confidence-banner {conf_class}">
-        <div>
-            <div style="display: flex; align-items: center; font-weight: 800; font-size: 1.05rem; color: {conf_text_color}; letter-spacing: 0.02em;">
-                <span class="confidence-indicator-dot {dot_class}"></span>
-                {conf.upper()} SOURCE CONFIDENCE
-            </div>
-            <div style="color: #CBD5E1; font-size: 0.9rem; margin-top: 0.35rem;">
-                {conf_reason}
-            </div>
-        </div>
-        <div style="background: rgba(11, 16, 32, 0.7); border: 1px solid rgba(79, 140, 255, 0.2); padding: 0.4rem 0.9rem; border-radius: 8px; font-size: 0.8rem; color: #94A3B8;">
-            Audit Status: <strong style="color: var(--color-teal);">100% Grounded Citations</strong>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    if not is_ai_unavailable:
+        # Confidence Level & Audit Banner
+        conf = res.get("confidence", "Medium")
+        conf_reason = res.get("confidence_reason", "")
+        
+        if conf == "High":
+            conf_class = "high"
+            dot_class = "dot-high"
+            conf_text_color = "var(--color-teal)"
+        elif conf == "Medium":
+            conf_class = "medium"
+            dot_class = "dot-medium"
+            conf_text_color = "var(--color-warning)"
+        else:
+            conf_class = "low"
+            dot_class = "dot-low"
+            conf_text_color = "var(--color-error)"
 
-    # Main Verified Synthesis Card
-    st.markdown(f"""
-    <div class="section-header">
-        {ICON_SHIELD} Verified Synthesis
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown(f"""
-    <div class="synthesis-card">
-        {res['answer']}
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Key Grounded Findings with Verified Citations
-    st.markdown(f"""
-    <div class="section-header">
-        {ICON_CHECK} Grounded Key Findings
-    </div>
-    """, unsafe_allow_html=True)
-    
-    findings = res.get("key_findings", [])
-    if findings:
-        for finding in findings:
-            claim_text = finding.get("claim", "")
-            source_ids = finding.get("source_ids", [])
-            
-            pills = "".join([f'<span class="citation-badge">Source [{sid}]</span>' for sid in source_ids])
-            st.markdown(f"""
-            <div class="finding-card">
-                <span class="finding-indicator">{ICON_CHECK}</span>
-                <div class="finding-body">
-                    {claim_text} {pills}
+        st.markdown(f"""
+        <div class="confidence-banner {conf_class}">
+            <div>
+                <div style="display: flex; align-items: center; font-weight: 800; font-size: 1.05rem; color: {conf_text_color}; letter-spacing: 0.02em;">
+                    <span class="confidence-indicator-dot {dot_class}"></span>
+                    {conf.upper()} SOURCE CONFIDENCE
+                </div>
+                <div style="color: #CBD5E1; font-size: 0.9rem; margin-top: 0.35rem;">
+                    {conf_reason}
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            <div style="background: rgba(11, 16, 32, 0.7); border: 1px solid rgba(79, 140, 255, 0.2); padding: 0.4rem 0.9rem; border-radius: 8px; font-size: 0.8rem; color: #94A3B8;">
+                Audit Status: <strong style="color: var(--color-teal);">100% Grounded Citations</strong>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Main Verified Synthesis Card
+        st.markdown(f"""
+        <div class="section-header">
+            {ICON_SHIELD} Verified Synthesis
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="synthesis-card">
+            {res['answer']}
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Key Grounded Findings with Verified Citations
+        st.markdown(f"""
+        <div class="section-header">
+            {ICON_CHECK} Grounded Key Findings
+        </div>
+        """, unsafe_allow_html=True)
+        
+        findings = res.get("key_findings", [])
+        if findings:
+            for finding in findings:
+                claim_text = finding.get("claim", "")
+                source_ids = finding.get("source_ids", [])
+                
+                pills = "".join([f'<span class="citation-badge">Source [{sid}]</span>' for sid in source_ids])
+                st.markdown(f"""
+                <div class="finding-card">
+                    <span class="finding-indicator">{ICON_CHECK}</span>
+                    <div class="finding-body">
+                        {claim_text} {pills}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No discrete key findings could be isolated from retrieved sources.")
     else:
-        st.info("No discrete key findings could be isolated from retrieved sources.")
+        # Notice in place of AI answer when NEBIUS_API_KEY is missing
+        st.markdown(f"""
+        <div class="synthesis-card" style="border-left: 4px solid var(--color-warning);">
+            <div style="display: flex; align-items: center; gap: 0.6rem; color: var(--color-warning); font-weight: 700; font-size: 1.05rem; margin-bottom: 0.6rem;">
+                {ICON_ALERT} AI answer unavailable until NEBIUS_API_KEY is added.
+            </div>
+            <div style="color: #CBD5E1; font-size: 0.95rem; line-height: 1.6; margin-bottom: 0.8rem;">
+                Primary web sources were successfully retrieved in real time via Tavily Search. 
+                To synthesize verified knowledge, generate key findings with citation auditing, and assess confidence, 
+                please add your <code>NEBIUS_API_KEY</code> to your <code>.env</code> file or Streamlit secrets.
+            </div>
+            <div style="background: rgba(11, 16, 32, 0.6); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 0.7rem 1rem; font-size: 0.85rem; color: #E2E8F0;">
+                Obtain a key at <a href="https://tokenfactory.nebius.com" target="_blank" style="color: var(--color-cyan); text-decoration: none; font-weight: 600;">tokenfactory.nebius.com</a>, add it to <code>.env</code> as <code>NEBIUS_API_KEY=your_key</code>, and re-run research.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Primary Web Evidence (Verified Sources - Accented with Teal #2DD4BF)
     sources = res.get("sources", [])

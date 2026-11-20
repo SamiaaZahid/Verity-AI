@@ -1,55 +1,80 @@
 import os
 import unittest
 from unittest.mock import patch
+from dotenv import load_dotenv
 from streamlit.testing.v1 import AppTest
 
+load_dotenv()
+
 class TestStreamlitAppUI(unittest.TestCase):
-    def test_missing_keys_setup_message_on_load(self):
-        """Verify that when API keys are missing, the UI shows a clear setup message and no fake output."""
-        with patch.dict(os.environ, {"TAVILY_API_KEY": "", "NEBIUS_API_KEY": ""}):
-            at = AppTest.from_file("app.py", default_timeout=15).run()
-            
-            # Ensure app did not crash
-            self.assertFalse(at.exception)
-            
-            # Check markdown elements for setup required message
-            all_markdown_text = " ".join([m.value for m in at.markdown])
-            self.assertIn("API Configuration Required", all_markdown_text)
-            self.assertIn("TAVILY_API_KEY", all_markdown_text)
-            self.assertIn("NEBIUS_API_KEY", all_markdown_text)
-            self.assertIn("No fake or ungrounded responses are ever produced", all_markdown_text)
+    def test_empty_input_shows_warning(self):
+        """Verify submitting an empty inquiry displays a warning and does not trigger search."""
+        at = AppTest.from_file("app.py", default_timeout=15).run()
+        self.assertFalse(at.exception)
+        
+        # Click research with empty input
+        research_btn = None
+        for btn in at.button:
+            if "Run Verified Research" in btn.label:
+                research_btn = btn
+                break
+        
+        self.assertIsNotNone(research_btn)
+        research_btn.click().run()
+        
+        # Verify warning is shown
+        self.assertTrue(len(at.warning) > 0)
+        self.assertIn("Please enter a research inquiry", at.warning[0].value)
 
-            # Check that no research synthesis card or fake sources exist
-            self.assertNotIn("Verified Synthesis", all_markdown_text)
-            self.assertNotIn("Primary Web Evidence", all_markdown_text)
-
-    def test_missing_keys_blocks_execution_on_button_click(self):
-        """Verify that clicking research with missing keys blocks execution and shows error setup instructions."""
-        with patch.dict(os.environ, {"TAVILY_API_KEY": "", "NEBIUS_API_KEY": ""}):
+    def test_missing_tavily_key_blocks_execution(self):
+        """Verify that when TAVILY_API_KEY is missing, execution is blocked with clear setup error."""
+        with patch.dict(os.environ, {"TAVILY_API_KEY": ""}):
             at = AppTest.from_file("app.py", default_timeout=15).run()
+            at.text_input[0].input("What is Artemis II?").run()
             
-            # Fill in a question
-            at.text_input[0].input("What is the launch date of Artemis II?").run()
-            
-            # Find and click the 'Run Verified Research' button
             research_btn = None
             for btn in at.button:
                 if "Run Verified Research" in btn.label:
                     research_btn = btn
                     break
             
-            self.assertIsNotNone(research_btn, "Research button not found")
             research_btn.click().run()
             
-            # Check error message displayed
             self.assertTrue(len(at.error) > 0)
-            error_text = " ".join([e.value for e in at.error])
-            self.assertIn("Execution Blocked", error_text)
-            self.assertIn("is missing from environment / secrets", error_text)
+            self.assertIn("TAVILY_API_KEY is missing", at.error[0].value)
 
-            # Ensure no fake synthesis or fake results are produced
+    def test_missing_nebius_key_allows_search_and_shows_notice(self):
+        """Verify that when NEBIUS_API_KEY is missing, search runs, sources appear, and clear notice replaces AI answer."""
+        tavily_key = os.environ.get("TAVILY_API_KEY", "")
+        if not tavily_key:
+            self.skipTest("TAVILY_API_KEY not present in environment")
+
+        with patch.dict(os.environ, {"NEBIUS_API_KEY": ""}):
+            at = AppTest.from_file("app.py", default_timeout=20).run()
+            at.text_input[0].input("NASA Artemis II launch date").run()
+            
+            research_btn = None
+            for btn in at.button:
+                if "Run Verified Research" in btn.label:
+                    research_btn = btn
+                    break
+            
+            research_btn.click().run()
+            
             all_markdown = " ".join([m.value for m in at.markdown])
-            self.assertNotIn("Verified Synthesis", all_markdown)
+            
+            # Check for AI unavailable notice
+            self.assertIn("AI answer unavailable until NEBIUS_API_KEY is added", all_markdown)
+            
+            # Check that real sources are rendered
+            self.assertIn("Primary Web Evidence", all_markdown)
+            self.assertIn("SOURCE [1]", all_markdown)
+            
+            # Check that Research Transparency panel is rendered
+            self.assertIn("Research Transparency Audit", all_markdown)
+            self.assertIn("None (NEBIUS_API_KEY missing)", all_markdown)
+
+            # Ensure no fake synthesis or fake citations
             self.assertNotIn("100% Grounded Citations", all_markdown)
 
 if __name__ == "__main__":

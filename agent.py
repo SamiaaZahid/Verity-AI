@@ -150,7 +150,7 @@ def run_verity_agent(
     if not clean_question:
         raise ValueError("Please provide a question to research.")
 
-    # Validate keys strictly
+    # Validate Tavily key (required for search)
     resolved_tavily_key = get_tavily_api_key(tavily_api_key)
     if not resolved_tavily_key:
         raise ValueError(
@@ -158,16 +158,9 @@ def run_verity_agent(
             "or Streamlit secrets (st.secrets)."
         )
 
-    resolved_nebius_key = get_nebius_api_key(nebius_api_key)
-    if not resolved_nebius_key:
-        raise ValueError(
-            "NEBIUS_API_KEY is missing. Please configure it in your environment variables (.env) "
-            "or Streamlit secrets (st.secrets)."
-        )
-
     resolved_base_url = get_nebius_base_url(base_url)
 
-    # Step 1: Web Retrieval
+    # Step 1: Web Retrieval via Tavily
     if progress_callback:
         progress_callback("searching", "Searching live web via Tavily...")
     
@@ -193,7 +186,26 @@ def run_verity_agent(
             "citations_verified": True
         }
 
-    # Step 2: Nebius Model Setup
+    # Step 2: Check Nebius Key (if missing, return retrieved sources without fake answer)
+    resolved_nebius_key = get_nebius_api_key(nebius_api_key)
+    if not resolved_nebius_key:
+        elapsed_time = round(time.time() - start_time, 2)
+        return {
+            "question": clean_question,
+            "answer": "AI answer unavailable until NEBIUS_API_KEY is added.",
+            "ai_unavailable": True,
+            "key_findings": [],
+            "confidence": "Unassessed",
+            "confidence_reason": "Real-time web sources retrieved successfully via Tavily. AI synthesis and confidence assessment require NEBIUS_API_KEY.",
+            "conflicts": "Cross-source conflict analysis requires NEBIUS_API_KEY inference.",
+            "gaps": "Information gap evaluation requires NEBIUS_API_KEY inference.",
+            "sources": sources,
+            "model_used": "None (NEBIUS_API_KEY missing)",
+            "execution_time_sec": elapsed_time,
+            "citations_verified": False
+        }
+
+    # Step 3: Nebius Model Setup
     if progress_callback:
         progress_callback("model_resolving", "Resolving Nebius open model...")
     
