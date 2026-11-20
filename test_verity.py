@@ -239,11 +239,14 @@ class TestVerityAgentGrounding(unittest.TestCase):
                 run_verity_agent("Valid question", tavily_api_key=None, nebius_api_key="mock-key")
             self.assertIn("TAVILY_API_KEY is missing", str(ctx.exception))
 
-    def test_agent_missing_nebius_key_raises_error_no_fake_output(self):
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(ValueError) as ctx:
-                run_verity_agent("Valid question", tavily_api_key="mock-key", nebius_api_key=None)
-            self.assertIn("NEBIUS_API_KEY is missing", str(ctx.exception))
+    @patch("agent.search_tavily")
+    def test_agent_missing_nebius_key_returns_sources_with_notice(self, mock_search):
+        mock_search.return_value = self.sample_sources
+        res = run_verity_agent("Valid question", tavily_api_key="mock-key", nebius_api_key=None)
+        self.assertTrue(res["ai_unavailable"])
+        self.assertEqual(res["answer"], "AI answer unavailable until NEBIUS_API_KEY is added.")
+        self.assertEqual(res["model_used"], "None (NEBIUS_API_KEY missing)")
+        self.assertEqual(len(res["sources"]), 2)
 
     def test_agent_empty_query_validation(self):
         with self.assertRaises(ValueError) as ctx:

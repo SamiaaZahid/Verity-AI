@@ -1,6 +1,6 @@
 import os
 import sys
-import urllib.request
+import httpx
 from unittest.mock import patch
 from dotenv import load_dotenv
 
@@ -47,20 +47,24 @@ def test_live_search_without_nebius():
         assert src["domain"], "Source domain cannot be empty"
         assert len(src["content"]) > 20, "Source snippet too short"
 
-    # 3. HTTP URL Reachability Check on real sources
+    # 3. HTTP URL Reachability Check on real sources using httpx
     print("\nVerifying that retrieved URLs point to real live pages...")
     verified_urls = 0
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    client = httpx.Client(
+        headers={"User-Agent": "VerityAI/1.0 (Hackathon Verification Engine)"},
+        timeout=10.0,
+        follow_redirects=True
+    )
     
-    for src in sources:
-        req = urllib.request.Request(src["url"], headers=headers)
-        try:
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                print(f"Verified live URL: {src['url']} (HTTP {resp.status})")
-                verified_urls += 1
-                break # 1 confirmed is sufficient proof of real live link
-        except Exception as e:
-            print(f"URL {src['url']} note: {e}")
+    with client:
+        for src in sources:
+            try:
+                resp = client.get(src["url"])
+                print(f"Verified live URL: {src['url']} (HTTP {resp.status_code})")
+                if resp.status_code < 400:
+                    verified_urls += 1
+            except Exception as e:
+                print(f"URL {src['url']} note: {e}")
 
     assert verified_urls > 0, "At least one URL must be confirmed live and reachable"
     print(f"\nSUCCESS: Live search and URL reachability confirmed! ({verified_urls} verified)")
