@@ -2,12 +2,19 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch
 import os
+import tempfile
 
 # Import modules to test
 from search import search_tavily, extract_domain, get_tavily_api_key
 from llm import (
+    get_nebius_api_key,
+    get_nebius_base_url,
+    get_nebius_model,
+    get_configured_nebius_model_name,
+    get_nebius_client,
     extract_json_from_text,
     select_best_model,
+    DEFAULT_NEBIUS_BASE_URL,
     PREFERRED_MODELS
 )
 from agent import (
@@ -15,6 +22,40 @@ from agent import (
     validate_and_sanitize_result,
     run_verity_agent
 )
+
+def helper_ensure_env_file(directory: str):
+    env_path = os.path.join(directory, ".env")
+    env_example_path = os.path.join(directory, ".env.example")
+    if not os.path.exists(env_path) and os.path.exists(env_example_path):
+        with open(env_example_path, "r", encoding="utf-8") as f_ex:
+            content = f_ex.read()
+        with open(env_path, "w", encoding="utf-8") as f_env:
+            f_env.write(content)
+
+class TestVerityEnvAndKeys(unittest.TestCase):
+    def test_ensure_env_file_creates_when_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            example_file = os.path.join(tmpdir, ".env.example")
+            with open(example_file, "w", encoding="utf-8") as f:
+                f.write("NEBIUS_API_KEY=\nTAVILY_API_KEY=\n")
+            
+            env_file = os.path.join(tmpdir, ".env")
+            self.assertFalse(os.path.exists(env_file))
+            
+            helper_ensure_env_file(tmpdir)
+            self.assertTrue(os.path.exists(env_file))
+            with open(env_file, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("NEBIUS_API_KEY=", content)
+            self.assertIn("TAVILY_API_KEY=", content)
+
+    def test_gitignore_excludes_env(self):
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        gitignore_path = os.path.join(root_dir, ".gitignore")
+        self.assertTrue(os.path.exists(gitignore_path))
+        with open(gitignore_path, "r", encoding="utf-8") as f:
+            lines = [line.strip() for line in f.readlines()]
+        self.assertIn(".env", lines)
 
 class TestVeritySearch(unittest.TestCase):
     def test_extract_domain(self):
@@ -26,7 +67,7 @@ class TestVeritySearch(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError) as ctx:
                 search_tavily("test query", api_key=None)
-            self.assertIn("Tavily API Key is missing", str(ctx.exception))
+            self.assertIn("TAVILY_API_KEY is missing", str(ctx.exception))
 
     def test_empty_query(self):
         with self.assertRaises(ValueError) as ctx:
@@ -63,6 +104,39 @@ class TestVeritySearch(unittest.TestCase):
         self.assertIn("September 2025", results[0]["content"])
 
 class TestVerityLLM(unittest.TestCase):
+    def test_missing_nebius_key(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(ValueError) as ctx:
+                get_nebius_client(api_key=None)
+            self.assertIn("NEBIUS_API_KEY is missing", str(ctx.exception))
+
+    def test_nebius_base_url_default_and_env(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(get_nebius_base_url(), DEFAULT_NEBIUS_BASE_URL)
+        
+        custom_url = "https://custom.nebius.endpoint/v1/"
+        with patch.dict(os.environ, {"NEBIUS_BASE_URL": custom_url}, clear=True):
+            self.assertEqual(get_nebius_base_url(), custom_url)
+
+    def test_nebius_model_from_env(self):
+        pinned_model = "meta-llama/Llama-3.3-70B-Instruct"
+        with patch.dict(os.environ, {"NEBIUS_MODEL": pinned_model}, clear=True):
+            self.assertEqual(get_configured_nebius_model_name(), pinned_model)
+            model_to_use = get_nebius_model(api_key="mock-key")
+            self.assertEqual(model_to_use, pinned_model)
+
+    @patch("llm.fetch_available_nebius_models")
+    def test_nebius_model_empty_queries_models_endpoint(self, mock_fetch):
+        mock_fetch.return_value = [
+            "meta-llama/Llama-3.3-70B-Instruct",
+            "Qwen/Qwen2.5-72B-Instruct"
+        ]
+        with patch.dict(os.environ, {"NEBIUS_MODEL": ""}, clear=True):
+            self.assertIsNone(get_configured_nebius_model_name())
+            model_to_use = get_nebius_model(api_key="mock-key")
+            self.assertEqual(model_to_use, "meta-llama/Llama-3.3-70B-Instruct")
+            mock_fetch.assert_called_once()
+
     def test_extract_json_plain(self):
         raw = '{"answer": "Clean summary", "confidence": "High"}'
         parsed = extract_json_from_text(raw)
@@ -125,7 +199,6 @@ class TestVerityAgentGrounding(unittest.TestCase):
         self.assertIn("Fact A is verified.", formatted)
 
     def test_citation_validator_purges_phantom_ids(self):
-        """CRITICAL: Test that citations with IDs not present in retrieved sources are purged."""
         raw_llm_output = {
             "answer": "Synthesized text",
             "confidence": "High",
@@ -155,18 +228,26 @@ class TestVerityAgentGrounding(unittest.TestCase):
         sanitized = validate_and_sanitize_result(raw_llm_output, self.sample_sources)
         findings = sanitized["key_findings"]
         
-        # Finding 0: [1]
         self.assertEqual(findings[0]["source_ids"], [1])
-        # Finding 1: [1, 2]
         self.assertEqual(findings[1]["source_ids"], [1, 2])
-        # Finding 2: 99 and 42 stripped, only [1] preserved
         self.assertEqual(findings[2]["source_ids"], [1])
-        # Finding 3: 88 stripped, empty list []
         self.assertEqual(findings[3]["source_ids"], [])
+
+    def test_agent_missing_tavily_key_raises_error_no_fake_output(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(ValueError) as ctx:
+                run_verity_agent("Valid question", tavily_api_key=None, nebius_api_key="mock-key")
+            self.assertIn("TAVILY_API_KEY is missing", str(ctx.exception))
+
+    def test_agent_missing_nebius_key_raises_error_no_fake_output(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(ValueError) as ctx:
+                run_verity_agent("Valid question", tavily_api_key="mock-key", nebius_api_key=None)
+            self.assertIn("NEBIUS_API_KEY is missing", str(ctx.exception))
 
     def test_agent_empty_query_validation(self):
         with self.assertRaises(ValueError) as ctx:
-            run_verity_agent("   ")
+            run_verity_agent("   ", tavily_api_key="mock", nebius_api_key="mock")
         self.assertIn("Please provide a question", str(ctx.exception))
 
     @patch("agent.search_tavily")

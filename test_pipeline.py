@@ -4,8 +4,8 @@ from agent import run_verity_agent
 
 @patch("agent.search_tavily")
 @patch("agent.get_nebius_client")
-@patch("agent.fetch_available_nebius_models")
-def test_full_pipeline_flow(mock_fetch_models, mock_get_client, mock_search):
+@patch("agent.get_nebius_model")
+def test_full_pipeline_flow(mock_get_model, mock_get_client, mock_search):
     # 1. Mock search return
     mock_search.return_value = [
         {
@@ -26,11 +26,8 @@ def test_full_pipeline_flow(mock_fetch_models, mock_get_client, mock_search):
         }
     ]
 
-    # 2. Mock model discovery
-    mock_fetch_models.return_value = [
-        "meta-llama/Llama-3.3-70B-Instruct",
-        "Qwen/Qwen2.5-72B-Instruct"
-    ]
+    # 2. Mock model resolution
+    mock_get_model.return_value = "meta-llama/Llama-3.3-70B-Instruct"
 
     # 3. Mock LLM completion
     mock_client = MagicMock()

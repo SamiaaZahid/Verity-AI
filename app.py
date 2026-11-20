@@ -1,17 +1,34 @@
 import os
 import streamlit as st
-import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
-# Load local environment variables if available
+# Ensure .env exists with empty values if missing
+def ensure_env_file():
+    """Ensure .env exists by copying .env.example with empty values if absent."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    env_path = os.path.join(base_dir, ".env")
+    env_example_path = os.path.join(base_dir, ".env.example")
+    if not os.path.exists(env_path) and os.path.exists(env_example_path):
+        try:
+            with open(env_example_path, "r", encoding="utf-8") as f_ex:
+                content = f_ex.read()
+            with open(env_path, "w", encoding="utf-8") as f_env:
+                f_env.write(content)
+        except Exception:
+            pass
+
+ensure_env_file()
+
+# Load environment variables from .env
 load_dotenv()
 
 from search import get_tavily_api_key
 from llm import (
     get_nebius_api_key,
+    get_nebius_base_url,
+    get_configured_nebius_model_name,
     fetch_available_nebius_models,
-    DEFAULT_NEBIUS_BASE_URL,
-    FALLBACK_NEBIUS_BASE_URL
+    DEFAULT_NEBIUS_BASE_URL
 )
 from agent import run_verity_agent
 
@@ -30,13 +47,12 @@ ICON_EXTERNAL = """<svg width="14" height="14" viewBox="0 0 24 24" fill="none" s
 ICON_CPU = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>"""
 ICON_DATABASE = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>"""
 ICON_CLOCK = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>"""
-ICON_INFO = """<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>"""
+ICON_ALERT = """<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>"""
 ICON_SETTINGS = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>"""
 
 # High-Performance Futuristic Dark Theme CSS
 st.markdown("""
 <style>
-    /* CSS Variables matching design palette */
     :root {
         --bg-main: #0B1020;
         --surface-card: #121A30;
@@ -54,7 +70,6 @@ st.markdown("""
         --border-highlight: rgba(34, 211, 238, 0.4);
     }
 
-    /* Ambient Background & Cursor Glow Mesh */
     .stApp {
         background-color: var(--bg-main) !important;
         background-image: 
@@ -66,14 +81,12 @@ st.markdown("""
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     }
 
-    /* Streamlit Main Container Spacing */
     .block-container {
         padding-top: 2rem !important;
         padding-bottom: 3.5rem !important;
         max-width: 1200px !important;
     }
 
-    /* Sidebar Styling */
     section[data-testid="stSidebar"] {
         background-color: #0D1426 !important;
         border-right: 1px solid var(--border-subtle) !important;
@@ -82,14 +95,12 @@ st.markdown("""
         padding-top: 2rem !important;
     }
 
-    /* Headings */
     h1, h2, h3, h4, h5 {
         color: var(--text-primary) !important;
         font-weight: 700 !important;
         letter-spacing: -0.02em !important;
     }
 
-    /* Keyframe Animations */
     @keyframes gradientFlow {
         0% { background-position: 0% 50%; }
         50% { background-position: 100% 50%; }
@@ -97,14 +108,8 @@ st.markdown("""
     }
 
     @keyframes fadeInSlide {
-        from {
-            opacity: 0;
-            transform: translateY(12px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes pulseGlow {
@@ -112,12 +117,6 @@ st.markdown("""
         50% { opacity: 1; transform: scale(1.05); }
     }
 
-    @keyframes shimmerBar {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
-    }
-
-    /* Landing Hero */
     .brand-hero {
         padding: 2rem 1rem 1.5rem 1rem;
         text-align: center;
@@ -167,7 +166,6 @@ st.markdown("""
         color: #CBD5E1;
         font-weight: 400;
         margin-bottom: 0.6rem;
-        letter-spacing: -0.01em;
     }
     .brand-description {
         color: var(--text-muted);
@@ -177,7 +175,6 @@ st.markdown("""
         line-height: 1.6;
     }
 
-    /* Futuristic Card Containers */
     .verity-card {
         background: var(--surface-card);
         border: 1px solid var(--border-subtle);
@@ -194,7 +191,6 @@ st.markdown("""
         transform: translateY(-2px);
     }
 
-    /* Section Subheaders */
     .section-header {
         display: flex;
         align-items: center;
@@ -207,17 +203,49 @@ st.markdown("""
         margin-bottom: 0.9rem;
     }
 
-    /* Example Query Interactive Cards */
-    .query-card-header {
+    /* Key Status Row */
+    .key-status-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.55rem 0.8rem;
+        background: rgba(18, 26, 48, 0.6);
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        margin-bottom: 0.6rem;
+    }
+    .status-badge-ok {
+        background: rgba(45, 212, 191, 0.15);
+        color: var(--color-teal);
+        border: 1px solid rgba(45, 212, 191, 0.4);
+        padding: 0.15rem 0.5rem;
+        border-radius: 6px;
         font-size: 0.72rem;
         font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--color-blue);
-        margin-bottom: 0.3rem;
+        letter-spacing: 0.05em;
+    }
+    .status-badge-missing {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--color-warning);
+        border: 1px solid rgba(245, 158, 11, 0.4);
+        padding: 0.15rem 0.5rem;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
     }
 
-    /* Streamlit Button Styling */
+    /* Missing Key Setup Alert Card */
+    .setup-required-card {
+        background: linear-gradient(180deg, rgba(24, 20, 36, 0.95) 0%, rgba(18, 26, 48, 0.95) 100%);
+        border: 1px solid rgba(245, 158, 11, 0.4);
+        border-left: 4px solid var(--color-warning);
+        border-radius: 12px;
+        padding: 1.4rem 1.6rem;
+        margin-bottom: 1.8rem;
+        animation: fadeInSlide 0.5s ease-out;
+    }
+
     div[data-testid="stButton"] button {
         background-color: var(--surface-card) !important;
         color: var(--text-primary) !important;
@@ -227,7 +255,6 @@ st.markdown("""
         font-weight: 600 !important;
         font-size: 0.92rem !important;
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
     }
     div[data-testid="stButton"] button:hover {
         background-color: var(--surface-card-hover) !important;
@@ -237,7 +264,6 @@ st.markdown("""
         box-shadow: 0 8px 24px -4px rgba(34, 211, 238, 0.3) !important;
     }
 
-    /* Primary Research Action Button */
     div[data-testid="stButton"] button[kind="primary"] {
         background: linear-gradient(135deg, var(--color-cyan) 0%, var(--color-blue) 50%, var(--color-violet) 100%) !important;
         background-size: 200% 200% !important;
@@ -255,7 +281,6 @@ st.markdown("""
         color: #050811 !important;
     }
 
-    /* Prominent Text Input Area */
     div[data-testid="stTextInput"] input {
         background-color: #0F162B !important;
         color: #F8FAFC !important;
@@ -264,25 +289,12 @@ st.markdown("""
         padding: 0.85rem 1.2rem !important;
         font-size: 1.05rem !important;
         transition: all 0.25s ease !important;
-        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4) !important;
     }
     div[data-testid="stTextInput"] input:focus {
         border-color: var(--color-cyan) !important;
-        box-shadow: 0 0 20px rgba(34, 211, 238, 0.25), inset 0 2px 6px rgba(0, 0, 0, 0.4) !important;
+        box-shadow: 0 0 20px rgba(34, 211, 238, 0.25) !important;
     }
 
-    /* Selectbox & Sliders */
-    div[data-baseweb="select"] > div {
-        background-color: #0F162B !important;
-        border-color: var(--border-subtle) !important;
-        color: var(--text-primary) !important;
-        border-radius: 10px !important;
-    }
-    div[data-baseweb="select"]:hover > div {
-        border-color: var(--color-blue) !important;
-    }
-
-    /* Answer Synthesis Box */
     .synthesis-card {
         background: linear-gradient(180deg, rgba(18, 26, 48, 0.9) 0%, rgba(13, 20, 38, 0.95) 100%);
         border: 1px solid rgba(79, 140, 255, 0.35);
@@ -293,11 +305,10 @@ st.markdown("""
         line-height: 1.75;
         font-size: 1.05rem;
         color: #E2E8F0;
-        box-shadow: 0 12px 35px -5px rgba(0, 0, 0, 0.55), 0 0 30px rgba(34, 211, 238, 0.08);
+        box-shadow: 0 12px 35px -5px rgba(0, 0, 0, 0.55);
         animation: fadeInSlide 0.5s ease-out;
     }
 
-    /* Grounded Finding Item */
     .finding-card {
         background: rgba(18, 26, 48, 0.65);
         border: 1px solid var(--border-subtle);
@@ -336,11 +347,8 @@ st.markdown("""
         font-size: 0.75rem;
         font-weight: 700;
         margin-left: 0.45rem;
-        vertical-align: baseline;
-        letter-spacing: 0.02em;
     }
 
-    /* Primary Verified Web Sources (Accented with Teal #2DD4BF) */
     .source-panel {
         background: #0E1529;
         border: 1px solid rgba(45, 212, 191, 0.22);
@@ -373,7 +381,6 @@ st.markdown("""
         font-size: 0.75rem;
         padding: 0.2rem 0.55rem;
         border-radius: 6px;
-        letter-spacing: 0.04em;
     }
     .source-domain-tag {
         color: var(--text-muted);
@@ -389,7 +396,6 @@ st.markdown("""
     .source-link-title a {
         color: #93C5FD !important;
         text-decoration: none !important;
-        transition: color 0.15s ease !important;
     }
     .source-link-title a:hover {
         color: var(--color-cyan) !important;
@@ -404,7 +410,6 @@ st.markdown("""
         overflow: hidden;
     }
 
-    /* Confidence Pill Banner */
     .confidence-banner {
         border-radius: 12px;
         padding: 1.1rem 1.5rem;
@@ -440,7 +445,6 @@ st.markdown("""
     .dot-medium { background-color: var(--color-warning); box-shadow: 0 0 12px var(--color-warning); }
     .dot-low { background-color: var(--color-error); box-shadow: 0 0 12px var(--color-error); }
 
-    /* Telemetry Transparency Panel */
     .telemetry-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -452,7 +456,6 @@ st.markdown("""
         border: 1px solid var(--border-subtle);
         border-radius: 10px;
         padding: 1rem 1.2rem;
-        transition: all 0.2s ease;
     }
     .telemetry-cell:hover {
         border-color: rgba(79, 140, 255, 0.4);
@@ -476,31 +479,12 @@ st.markdown("""
         word-break: break-all;
     }
 
-    /* Custom Streamlit Expander Overrides */
-    div[data-testid="stExpander"] {
-        background-color: var(--surface-card) !important;
-        border: 1px solid var(--border-subtle) !important;
-        border-radius: 12px !important;
-        margin-bottom: 1rem !important;
-        overflow: hidden !important;
-    }
-    div[data-testid="stExpander"]:hover {
-        border-color: var(--border-highlight) !important;
-    }
-    div[data-testid="stExpander"] summary {
-        color: var(--text-primary) !important;
-        font-weight: 600 !important;
-        font-size: 0.95rem !important;
-    }
-
-    /* Subtle Animated Gradient Progress Bar */
     .progress-bar-container {
         width: 100%;
         height: 6px;
         background: rgba(18, 26, 48, 0.8);
         border-radius: 9999px;
         overflow: hidden;
-        position: relative;
         margin: 1rem 0;
         border: 1px solid var(--border-subtle);
     }
@@ -512,7 +496,6 @@ st.markdown("""
         animation: gradientFlow 2.5s linear infinite;
     }
 
-    /* Footer */
     .verity-footer {
         margin-top: 4rem;
         padding-top: 2rem;
@@ -522,18 +505,11 @@ st.markdown("""
         font-size: 0.85rem;
         line-height: 1.6;
     }
-
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-        .brand-title { font-size: 2.3rem !important; }
-        .brand-tagline { font-size: 1.05rem !important; }
-        .telemetry-grid { grid-template-columns: 1fr 1fr !important; }
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# Safe Mouse-Follow Cursor Glow Effect (non-blocking, pointer-events: none)
-components.html("""
+# Cursor Glow
+st.html("""
 <script>
 (function() {
     try {
@@ -565,22 +541,16 @@ components.html("""
                 glow.style.opacity = '0';
             });
         }
-    } catch (err) {
-        // Fallback for sandboxed environments
-    }
+    } catch (err) {}
 })();
 </script>
-""", height=0, width=0)
+""")
 
-# Helper function to check secrets
-def resolve_secret(key_name: str) -> str:
-    """Check st.secrets first, then environment variable."""
-    try:
-        if key_name in st.secrets:
-            return str(st.secrets[key_name]).strip()
-    except Exception:
-        pass
-    return os.environ.get(key_name, "").strip()
+# Resolve keys exclusively from environment variables or st.secrets
+active_tavily_key = get_tavily_api_key()
+active_nebius_key = get_nebius_api_key()
+active_base_url = get_nebius_base_url()
+configured_model_name = get_configured_nebius_model_name()
 
 # Initialize Session State
 if "query_input" not in st.session_state:
@@ -596,61 +566,71 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
-    st.caption("Verity AI orchestrates Nebius Token Factory open models with Tavily real-time grounding.")
+    st.caption("Verity AI reads credentials strictly from environment variables (.env) or Streamlit secrets.")
     
-    # API Keys Resolution
-    env_tavily = resolve_secret("TAVILY_API_KEY")
-    env_nebius = resolve_secret("NEBIUS_API_KEY")
-    
-    tavily_key_input = st.text_input(
-        "Tavily API Key",
-        value=env_tavily,
-        type="password",
-        help="Access key from tavily.com"
-    )
-    
-    nebius_key_input = st.text_input(
-        "Nebius Token Factory API Key",
-        value=env_nebius,
-        type="password",
-        help="Access key from tokenfactory.nebius.com"
-    )
+    # Credential Status Displays
+    tavily_status_html = f'<span class="status-badge-ok">{ICON_CHECK} CONFIGURED</span>' if active_tavily_key else f'<span class="status-badge-missing">{ICON_ALERT} MISSING</span>'
+    nebius_status_html = f'<span class="status-badge-ok">{ICON_CHECK} CONFIGURED</span>' if active_nebius_key else f'<span class="status-badge-missing">{ICON_ALERT} MISSING</span>'
 
-    base_url_choice = st.selectbox(
-        "Nebius Endpoint",
-        options=[DEFAULT_NEBIUS_BASE_URL, FALLBACK_NEBIUS_BASE_URL],
-        index=0,
-        help="OpenAI-compatible inference base URL"
-    )
+    st.markdown(f"""
+    <div class="key-status-row">
+        <span style="font-size: 0.82rem; font-weight: 600; color: #CBD5E1;">TAVILY_API_KEY</span>
+        {tavily_status_html}
+    </div>
+    <div class="key-status-row">
+        <span style="font-size: 0.82rem; font-weight: 600; color: #CBD5E1;">NEBIUS_API_KEY</span>
+        {nebius_status_html}
+    </div>
+    """, unsafe_allow_html=True)
 
-    # Dynamic Model Discovery via official Nebius /models endpoint
+    # Active Base URL
+    st.markdown(f"""
+    <div style="background: rgba(18, 26, 48, 0.4); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.6rem 0.8rem; margin: 0.6rem 0 1rem 0;">
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Active Endpoint (NEBIUS_BASE_URL)</div>
+        <div style="font-size: 0.82rem; color: #93C5FD; word-break: break-all; margin-top: 0.2rem;">{active_base_url}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Dynamic Model Discovery / Configuration
     st.markdown("---")
     st.markdown(f"""
     <div class="section-header">
-        {ICON_CPU} Model Selection
+        {ICON_CPU} Model Configuration
     </div>
     """, unsafe_allow_html=True)
-    
-    model_options = ["Auto-select best open model"]
-    if nebius_key_input:
-        try:
-            with st.spinner("Connecting to Nebius /models endpoint..."):
-                discovered_models = fetch_available_nebius_models(
-                    api_key=nebius_key_input,
-                    base_url=base_url_choice
-                )
-                if discovered_models:
-                    model_options = ["Auto-select best open model"] + discovered_models
-        except Exception as e:
-            st.caption(f"Catalog notice: {str(e)[:55]}... Model will auto-resolve on execute.")
-    
-    chosen_model = st.selectbox(
-        "Inference Model",
-        options=model_options,
-        index=0,
-        help="Active open models available on Nebius Token Factory"
-    )
-    
+
+    if configured_model_name:
+        st.markdown(f"""
+        <div style="background: rgba(18, 26, 48, 0.6); border: 1px solid rgba(79, 140, 255, 0.25); border-radius: 8px; padding: 0.6rem 0.8rem; margin-bottom: 0.8rem;">
+            <div style="font-size: 0.7rem; color: var(--color-cyan); text-transform: uppercase; font-weight: 700;">Pinned Model (from NEBIUS_MODEL)</div>
+            <div style="font-size: 0.88rem; font-weight: 600; color: #F8FAFC; margin-top: 0.2rem;">{configured_model_name}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        chosen_model = configured_model_name
+    else:
+        # If NEBIUS_MODEL is empty, query live /models from Nebius when key is available
+        model_options = ["Auto-select best open model"]
+        if active_nebius_key:
+            try:
+                with st.spinner("Connecting to Nebius /models catalog..."):
+                    discovered_models = fetch_available_nebius_models(
+                        api_key=active_nebius_key,
+                        base_url=active_base_url
+                    )
+                    if discovered_models:
+                        model_options = ["Auto-select best open model"] + discovered_models
+            except Exception as e:
+                st.caption(f"Catalog notice: {str(e)[:55]}... Model will auto-resolve on execute.")
+        else:
+            st.caption("NEBIUS_MODEL is empty. Model list will load once NEBIUS_API_KEY is configured.")
+
+        chosen_model = st.selectbox(
+            "Inference Model",
+            options=model_options,
+            index=0,
+            help="Models queried dynamically from official Nebius /models catalog"
+        )
+
     max_sources_slider = st.slider(
         "Max Grounding Sources",
         min_value=3,
@@ -691,6 +671,38 @@ st.markdown(f"""
     </p>
 </div>
 """, unsafe_allow_html=True)
+
+# Missing Key Alert Card (Shown prominent on main dashboard if any required key is missing)
+keys_missing = []
+if not active_tavily_key:
+    keys_missing.append("TAVILY_API_KEY")
+if not active_nebius_key:
+    keys_missing.append("NEBIUS_API_KEY")
+
+if keys_missing:
+    missing_items_html = " ".join([f"<strong style='color: var(--color-warning);'>{k}</strong>" for k in keys_missing])
+    st.markdown(f"""
+    <div class="setup-required-card">
+        <div style="display: flex; align-items: center; gap: 0.6rem; color: var(--color-warning); font-weight: 700; font-size: 1rem; margin-bottom: 0.5rem;">
+            {ICON_ALERT} API Configuration Required: {missing_items_html}
+        </div>
+        <div style="color: #CBD5E1; font-size: 0.9rem; line-height: 1.6; margin-bottom: 0.8rem;">
+            Verity AI strictly requires genuine API credentials to execute real-time web grounding and open-model inference. 
+            <strong>No fake or ungrounded responses are ever produced.</strong>
+        </div>
+        <div style="background: rgba(11, 16, 32, 0.7); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.85rem; color: #E2E8F0; line-height: 1.6;">
+            <strong>How to configure locally:</strong><br>
+            1. Open the <code>.env</code> file in your project directory (created automatically from <code>.env.example</code>).<br>
+            2. Add your keys: <code>TAVILY_API_KEY=tvly-...</code> and <code>NEBIUS_API_KEY=...</code><br>
+            3. Restart Streamlit or refresh this page.<br><br>
+            <strong>How to configure on Streamlit Community Cloud:</strong><br>
+            Add <code>TAVILY_API_KEY</code> and <code>NEBIUS_API_KEY</code> in <em>App Settings &gt; Secrets</em>.<br><br>
+            <strong>Obtain credentials:</strong><br>
+            • Tavily Search: <a href="https://tavily.com" target="_blank" style="color: var(--color-cyan); text-decoration: none;">tavily.com</a><br>
+            • Nebius Token Factory: <a href="https://tokenfactory.nebius.com" target="_blank" style="color: var(--color-cyan); text-decoration: none;">tokenfactory.nebius.com</a>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Example Inquiries Section
 st.markdown(f"""
@@ -739,22 +751,22 @@ if research_pressed:
     # 1. Empty input validation
     if not query_text or not query_text.strip():
         st.warning("Please enter a research inquiry before running verification.")
-    # 2. Key validation
-    elif not tavily_key_input:
-        st.error("Tavily API Key Required")
+    # 2. Strict Key Validation (Clear setup message, NEVER fake output)
+    elif not active_tavily_key:
+        st.error("Execution Blocked: TAVILY_API_KEY is missing from environment / secrets.")
         st.info("""
-        Quick Setup Steps:
-        1. Visit tavily.com and create an account.
-        2. Copy your API Key from the dashboard.
-        3. Enter it in the sidebar Engine Configuration, or add TAVILY_API_KEY to your .env file.
+        Setup Instructions for Tavily:
+        1. Obtain a free API key at https://tavily.com.
+        2. Set TAVILY_API_KEY in your local .env file or Streamlit Cloud Secrets.
+        3. Refresh the page to execute verified research.
         """)
-    elif not nebius_key_input:
-        st.error("Nebius Token Factory API Key Required")
+    elif not active_nebius_key:
+        st.error("Execution Blocked: NEBIUS_API_KEY is missing from environment / secrets.")
         st.info("""
-        Quick Setup Steps:
-        1. Log in to tokenfactory.nebius.com.
-        2. Navigate to API Keys and generate a new key.
-        3. Enter it in the sidebar Engine Configuration, or add NEBIUS_API_KEY to your .env file.
+        Setup Instructions for Nebius Token Factory:
+        1. Obtain an API key from https://tokenfactory.nebius.com under API Keys.
+        2. Set NEBIUS_API_KEY in your local .env file or Streamlit Cloud Secrets.
+        3. Refresh the page to execute verified research.
         """)
     else:
         # Step-by-step progress tracking with animated bar
@@ -781,11 +793,11 @@ if research_pressed:
             with st.spinner("Synthesizing verified research..."):
                 result = run_verity_agent(
                     question=query_text.strip(),
-                    tavily_api_key=tavily_key_input,
-                    nebius_api_key=nebius_key_input,
+                    tavily_api_key=active_tavily_key,
+                    nebius_api_key=active_nebius_key,
                     selected_model=target_model,
                     max_sources=max_sources_slider,
-                    base_url=base_url_choice,
+                    base_url=active_base_url,
                     progress_callback=handle_progress
                 )
                 st.session_state.research_results = result

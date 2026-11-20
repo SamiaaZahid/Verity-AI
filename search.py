@@ -3,11 +3,28 @@ from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse
 from tavily import TavilyClient
 
+def get_secret(key: str, default: Optional[str] = None) -> Optional[str]:
+    """Retrieve secret from Streamlit secrets first, then environment variables."""
+    try:
+        import streamlit as st
+        if key in st.secrets:
+            val = str(st.secrets[key]).strip()
+            if val:
+                return val
+    except Exception:
+        pass
+    
+    val = os.environ.get(key, "").strip()
+    if val:
+        return val
+        
+    return default
+
 def get_tavily_api_key(provided_key: Optional[str] = None) -> Optional[str]:
-    """Retrieve Tavily API key from argument, environment, or Streamlit secrets."""
+    """Retrieve Tavily API key from argument, st.secrets, or environment variables."""
     if provided_key and provided_key.strip():
         return provided_key.strip()
-    return os.environ.get("TAVILY_API_KEY", "").strip() or None
+    return get_secret("TAVILY_API_KEY")
 
 def extract_domain(url: str) -> str:
     """Extract clean domain name from URL."""
@@ -27,25 +44,16 @@ def search_tavily(
 ) -> List[Dict[str, Any]]:
     """
     Execute real-time Tavily search.
+    Never returns fake or hallucinated results.
     
     Args:
         query: The search query string.
-        api_key: Tavily API key (optional if set in env).
+        api_key: Tavily API key (optional; resolved from st.secrets or env).
         max_results: Maximum number of sources (default: 5).
         search_depth: "basic" or "advanced" (default: "basic").
         
     Returns:
-        List of dicts: [
-            {
-                "id": 1,
-                "title": str,
-                "url": str,
-                "content": str,
-                "domain": str,
-                "score": float
-            },
-            ...
-        ]
+        List of dicts containing verified sources.
         
     Raises:
         ValueError: If API key is missing or query is empty.
@@ -54,8 +62,8 @@ def search_tavily(
     resolved_key = get_tavily_api_key(api_key)
     if not resolved_key:
         raise ValueError(
-            "Tavily API Key is missing. Please provide a key in the sidebar, "
-            ".env file, or set the TAVILY_API_KEY environment variable."
+            "TAVILY_API_KEY is missing. Please configure it in your environment variables (.env) "
+            "or Streamlit secrets (st.secrets)."
         )
 
     clean_query = query.strip()
@@ -74,7 +82,7 @@ def search_tavily(
     except Exception as e:
         error_msg = str(e)
         if "unauthorized" in error_msg.lower() or "invalid api key" in error_msg.lower():
-            raise RuntimeError("Invalid Tavily API Key. Please verify your credentials.") from e
+            raise RuntimeError("Invalid Tavily API key. Please verify your credentials at tavily.com.") from e
         raise RuntimeError(f"Tavily search request failed: {error_msg}") from e
 
     raw_results = response.get("results", [])
@@ -84,7 +92,6 @@ def search_tavily(
     structured_sources: List[Dict[str, Any]] = []
     for idx, item in enumerate(raw_results, start=1):
         raw_content = item.get("content") or item.get("snippet") or ""
-        # Clean content string
         content = " ".join(raw_content.split())
         
         structured_sources.append({

@@ -1,12 +1,12 @@
 import time
 from typing import Dict, Any, List, Optional
-from search import search_tavily
+from search import search_tavily, get_tavily_api_key
 from llm import (
     get_nebius_client,
-    fetch_available_nebius_models,
-    select_best_model,
-    generate_grounded_answer,
-    DEFAULT_NEBIUS_BASE_URL
+    get_nebius_api_key,
+    get_nebius_base_url,
+    get_nebius_model,
+    generate_grounded_answer
 )
 
 SYSTEM_PROMPT = """You are Verity AI, an objective, rigorous scientific research verification agent.
@@ -131,15 +131,15 @@ def run_verity_agent(
     nebius_api_key: Optional[str] = None,
     selected_model: Optional[str] = None,
     max_sources: int = 5,
-    base_url: str = DEFAULT_NEBIUS_BASE_URL,
+    base_url: Optional[str] = None,
     progress_callback: Optional[callable] = None
 ) -> Dict[str, Any]:
     """
     Execute end-to-end Verity AI research pipeline:
-    1. Validation of inputs
+    1. Resolve API keys strictly from env/st.secrets or arguments
     2. Tavily real-time search
     3. Source numbering & structuring
-    4. Nebius live model resolution
+    4. Nebius live model resolution (reads NEBIUS_MODEL or queries /models)
     5. Grounded synthesis via Nebius Token Factory
     6. Citation verification & JSON sanitization
     
@@ -150,13 +150,30 @@ def run_verity_agent(
     if not clean_question:
         raise ValueError("Please provide a question to research.")
 
+    # Validate keys strictly
+    resolved_tavily_key = get_tavily_api_key(tavily_api_key)
+    if not resolved_tavily_key:
+        raise ValueError(
+            "TAVILY_API_KEY is missing. Please configure it in your environment variables (.env) "
+            "or Streamlit secrets (st.secrets)."
+        )
+
+    resolved_nebius_key = get_nebius_api_key(nebius_api_key)
+    if not resolved_nebius_key:
+        raise ValueError(
+            "NEBIUS_API_KEY is missing. Please configure it in your environment variables (.env) "
+            "or Streamlit secrets (st.secrets)."
+        )
+
+    resolved_base_url = get_nebius_base_url(base_url)
+
     # Step 1: Web Retrieval
     if progress_callback:
         progress_callback("searching", "Searching live web via Tavily...")
     
     sources = search_tavily(
         query=clean_question,
-        api_key=tavily_api_key,
+        api_key=resolved_tavily_key,
         max_results=max_sources,
         search_depth="basic"
     )
@@ -178,15 +195,16 @@ def run_verity_agent(
 
     # Step 2: Nebius Model Setup
     if progress_callback:
-        progress_callback("model_resolving", "Connecting to Nebius Token Factory...")
+        progress_callback("model_resolving", "Resolving Nebius open model...")
     
-    client = get_nebius_client(api_key=nebius_api_key, base_url=base_url)
+    client = get_nebius_client(api_key=resolved_nebius_key, base_url=resolved_base_url)
     
-    # Resolve model dynamically if not specified
-    model_to_use = selected_model
-    if not model_to_use:
-        available_models = fetch_available_nebius_models(api_key=nebius_api_key, base_url=base_url)
-        model_to_use = select_best_model(available_models)
+    # Resolve model: checks selected_model -> NEBIUS_MODEL -> Nebius /models live list
+    model_to_use = get_nebius_model(
+        api_key=resolved_nebius_key,
+        base_url=resolved_base_url,
+        provided_model=selected_model
+    )
 
     # Step 3: LLM Inference
     if progress_callback:
