@@ -1,14 +1,14 @@
-# 🛡️ Verity AI
+# Verity AI
 ### *From Question to Verified Knowledge*
 
-[![Hackathon](https://img.shields.io/badge/ODSC%20%C3%97%20Nebius-Hackathon%202026-6366f1?style=for-the-badge)](https://odsc.com)
+[![Hackathon](https://img.shields.io/badge/ODSC%20x%20Nebius-Hackathon%202026-6366f1?style=for-the-badge)](https://odsc.com)
 [![Engine](https://img.shields.io/badge/Nebius-Token%20Factory-0284c7?style=for-the-badge)](https://tokenfactory.nebius.com)
 [![Search](https://img.shields.io/badge/Search-Tavily%20API-10b981?style=for-the-badge)](https://tavily.com)
 [![Framework](https://img.shields.io/badge/Built%20With-Streamlit-ff4b4b?style=for-the-badge)](https://streamlit.io)
 
 ---
 
-## 📖 Overview
+## Overview
 
 **Verity AI** is an autonomous scientific and analytical research agent designed to combat the epidemic of LLM hallucinations. Rather than generating answers from static model weights, Verity AI retrieves real-time, authoritative ground truth via **Tavily Search**, submits the evidence to high-performance open-weight models hosted on **Nebius Token Factory**, and subjects the output to a strict citation and cross-verification pipeline.
 
@@ -16,7 +16,7 @@ Every claim is attributed to specific, real-world source IDs (`[1]`, `[2]`), con
 
 ---
 
-## 🎯 The Problem
+## The Problem
 
 Large Language Models (LLMs) suffer from critical vulnerabilities when used for analytical or scientific research:
 1. **Hallucination & Fabrication:** Models confidently generate convincing citations, fake URLs, and non-existent data points.
@@ -26,7 +26,7 @@ Large Language Models (LLMs) suffer from critical vulnerabilities when used for 
 
 ---
 
-## 💡 The Solution
+## The Solution
 
 Verity AI solves this with a **zero-hallucination, verification-first architecture**:
 * **Live Retrieval:** Queries Tavily for primary web sources with deep snippet extraction.
@@ -36,52 +36,52 @@ Verity AI solves this with a **zero-hallucination, verification-first architectu
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```
 [ User Inquiry ]
-       │
-       ▼
+       |
+       v
 [ Query Validation ]
-       │
-       ▼
-[ Tavily Real-Time Search API ] ──► (Fetches top verified web sources & snippets)
-       │
-       ▼
-[ Evidence Numbering & Grounding Prompt ] ──► ([1], [2], [3] source indexing)
-       │
-       ▼
-[ Nebius Token Factory ] ──► (Inference with open models: Llama 3.3, Qwen 2.5, DeepSeek)
-       │
-       ▼
+       |
+       v
+[ Tavily Real-Time Search API ] --> (Fetches top verified web sources & snippets)
+       |
+       v
+[ Evidence Numbering & Grounding Prompt ] --> ([1], [2], [3] source indexing)
+       |
+       v
+[ Nebius Token Factory ] --> (Inference with open models: Llama 3.3, Qwen 2.5, DeepSeek)
+       |
+       v
 [ Structured JSON Output ]
-  ├── Verified Answer with inline citations
-  ├── Key Findings mapped to source_ids
-  ├── Confidence Score & Rationale
-  ├── Detected Contradictions
-  └── Information Gaps
-       │
-       ▼
-[ Verification & Citation Audit ] ──► (Verifies all cited IDs exist; strips phantoms)
-       │
-       ▼
-[ Premium Streamlit UI ] ──► (Interactive citation pills, source cards, transparency panel)
+  |-- Verified Answer with inline citations
+  |-- Key Findings mapped to source_ids
+  |-- Confidence Score & Rationale
+  |-- Detected Contradictions
+  \-- Information Gaps
+       |
+       v
+[ Verification & Citation Audit ] --> (Verifies all cited IDs exist; strips phantoms)
+       |
+       v
+[ Premium Futuristic Dashboard ] --> (Interactive citation badges, source cards, telemetry)
 ```
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-- **🛡️ Strict Grounding Guarantee:** The agent is constitutionally instructed to answer strictly based on provided source snippets.
-- **🔗 Verified Citation Badges:** Every key finding is tagged with verified badge pills (e.g. `Source [1]`, `Source [2]`) linking directly to primary web sources.
-- **⚡ Dynamic Nebius Model Discovery:** Queries the official Nebius `/models` endpoint dynamically to list and select real open models without hardcoded guesses.
-- **⚖️ Contradiction & Gap Detection:** Identifies discrepancies across sources and discloses unanswered angles.
-- **🔬 Full Research Transparency Panel:** Exposes the exact query, inference model, source count, latency, and citation validity.
-- **🎨 Premium Dark Theme:** Custom-styled dark navy/charcoal UI with gradient accents, responsive cards, and step-by-step progress tracking.
+- **Strict Grounding Guarantee:** The agent is constitutionally instructed to answer strictly based on provided source snippets.
+- **Verified Citation Badges:** Every key finding is tagged with verified badge pills (e.g. `Source [1]`, `Source [2]`) linking directly to primary web sources.
+- **Dynamic Nebius Model Discovery:** Queries the official Nebius `/models` endpoint dynamically to list and select real open models without hardcoded guesses.
+- **Contradiction & Gap Detection:** Identifies discrepancies across sources and discloses unanswered angles.
+- **Full Research Transparency Panel:** Exposes the exact query, inference model, source count, latency, and citation validity.
+- **Futuristic Dark Interface:** Custom-styled dark navy/charcoal UI (`#0B1020`, `#121A30`) with Cyan, Blue, Violet gradients, Teal accents for verified sources, and smooth interactive hover effects.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Inference Provider:** [Nebius Token Factory](https://tokenfactory.nebius.com) (OpenAI-compatible open-weights API)
 - **Web Grounding:** [Tavily Search API](https://tavily.com)
@@ -91,24 +91,24 @@ Verity AI solves this with a **zero-hallucination, verification-first architectu
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 verity-ai/
-├── app.py              # Main Streamlit web application & UI components
-├── agent.py            # Research orchestration & citation audit logic
-├── search.py           # Tavily search wrapper & source extraction
-├── llm.py              # Nebius Token Factory client & dynamic model discovery
-├── requirements.txt    # Project dependencies
-├── .env.example        # Environment variable template
-├── .gitignore          # Git exclusion rules
-├── SUBMISSION.md       # ODSC × Nebius Hackathon pitch & demo script
-└── README.md           # Comprehensive project documentation
+|-- app.py              # Main Streamlit web application & UI components
+|-- agent.py            # Research orchestration & citation audit logic
+|-- search.py           # Tavily search wrapper & source extraction
+|-- llm.py              # Nebius Token Factory client & dynamic model discovery
+|-- requirements.txt    # Project dependencies
+|-- .env.example        # Environment variable template
+|-- .gitignore          # Git exclusion rules
+|-- SUBMISSION.md       # ODSC x Nebius Hackathon pitch & demo script
+\-- README.md           # Comprehensive project documentation
 ```
 
 ---
 
-## 🚀 Quickstart & Local Setup
+## Quickstart & Local Setup
 
 ### 1. Prerequisites
 - Python 3.10 or higher
@@ -161,7 +161,7 @@ Open your browser at `http://localhost:8501`.
 
 ---
 
-## ☁️ Deployment Guide (Streamlit Community Cloud)
+## Deployment Guide (Streamlit Community Cloud)
 
 1. **Push your code to GitHub:**
    ```bash
@@ -185,7 +185,7 @@ Open your browser at `http://localhost:8501`.
 
 ---
 
-## 🧪 Testing Checklist
+## Testing Checklist
 
 - [x] **Empty Input Validation:** Displays a warning if research query is submitted empty.
 - [x] **Missing Keys Guard:** Informs user with clear steps if API keys are absent; prevents unauthenticated crashes.
@@ -196,7 +196,7 @@ Open your browser at `http://localhost:8501`.
 
 ---
 
-## 🔮 Limitations & Future Work
+## Limitations & Future Work
 
 - **Multi-Hop Search:** Expand single-turn search into iterative multi-hop reasoning (e.g. generating sub-queries for complex multi-part questions).
 - **PDF & Academic Paper Grounding:** Integrate arXiv and PubMed API extractors alongside Tavily web search.
@@ -204,7 +204,7 @@ Open your browser at `http://localhost:8501`.
 
 ---
 
-## 📜 License & Acknowledgments
+## License & Acknowledgments
 
-Built with pride for the **ODSC × Nebius AI Hackathon 2026**.
+Built for the **ODSC x Nebius AI Hackathon 2026**.
 Powered by open models on **Nebius Token Factory** and search intelligence from **Tavily**.
